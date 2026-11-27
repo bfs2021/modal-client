@@ -988,7 +988,7 @@ class _Function(typing.Generic[P, ReturnType, OriginalReturnType], _Object, type
                     module_name=info.module_name or "",
                     function_name=info.function_name,
                     implementation_name=info.implementation_name,
-                    mount_ids=loaded_mount_ids,
+                    mount_ids=sorted(loaded_mount_ids),
                     secret_ids=[secret.object_id for secret in secrets],
                     image_id=(image.object_id if image else ""),
                     definition_type=info.get_definition_type(),

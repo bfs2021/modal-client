@@ -134,7 +134,10 @@ def _select_files(entries: list[_MountEntry]) -> list[tuple[Path, PurePosixPath]
     all_files: set[tuple[Path, PurePosixPath]] = set()
     for entry in entries:
         all_files |= set(entry.get_files_to_upload())
-    return list(all_files)
+    # The order feeds MountGetOrCreateRequest.files and thus the mount's content
+    # checksum; set iteration order varies with PYTHONHASHSEED, which would make
+    # otherwise identical deploys produce new function definitions (#4126).
+    return sorted(all_files, key=lambda item: str(item[1]))
 
 
 @dataclasses.dataclass
@@ -680,6 +683,10 @@ class _Mount(_Object, type_prefixes=("mo",)):
         ) as stream:
             async for file in stream:
                 files.append(file)
+
+        # Keep the wire request byte-for-byte reproducible across runs with
+        # different hash seeds (#4126).
+        files.sort(key=lambda f: f.filename)
 
         if not files:
             logger.warning(f"Mount of '{message_label}' is empty.")

@@ -15,7 +15,13 @@ from modal._load_context import LoadContext
 from modal._resolver import Resolver
 from modal._utils.async_utils import TaskContext, synchronizer
 from modal._utils.blob_utils import LARGE_FILE_LIMIT
-from modal.mount import Mount, client_mount_name, module_mount_condition, module_mount_ignore_condition
+from modal.mount import (
+    Mount,
+    _select_files,
+    client_mount_name,
+    module_mount_condition,
+    module_mount_ignore_condition,
+)
 from modal_proto import api_pb2
 
 
@@ -274,3 +280,21 @@ def test_mount_from_local_dir_ignore(test_dir, client, tmp_path_with_content):
 def test_client_mount_name():
     # This is expected to raise if we cannot parse the version correctly
     assert client_mount_name().startswith("modal-client-mount")
+
+
+def test_select_files_is_deterministic(tmp_path):
+    """_select_files feeds MountGetOrCreateRequest.files; its order must not vary with PYTHONHASHSEED.
+
+    Regression test for #4126: a list(set(...)) result made the mount content checksum
+    (and therefore the function definition_id) change between otherwise identical deploys.
+    """
+    for name in ("zeta.txt", "alpha.txt", "mid.txt", "beta.txt", "omega.txt"):
+        (tmp_path / name).write_text(name)
+
+    entry = Mount._from_local_dir(tmp_path, remote_path="/", recursive=True).entries[0]
+    files = _select_files([entry])
+    remote_paths = [str(remote) for _, remote in files]
+
+    # Sorted by remote filename so the wire request is byte-for-byte reproducible.
+    assert remote_paths == sorted(remote_paths)
+
